@@ -1,0 +1,21 @@
+﻿TODO:
+31.0.2016
+	1.refactor SqlHelper in order to do it as 
+	https://stackoverflow.com/questions/10460207/how-to-close-sqlite-connection-without-explicitly-calling-close-method-using-ne
+	post says. I must use "using SQLiteConnection cn = new SQLiteConnection(GetConnectionString())".
+	It allows me to not care about opening and closing db.
+	2. Continue working on PutOnSell module. For now I can fetch Bot's inventory, and I need to find a neat way to understand, what I can sell and
+	what I can't. somehow compare it to GetTrades method.
+02.02.2016
+	1.Finish SQL-adding-to base soft.
+	2.Continue work on PutOnSell module.
+
+	Done:
+31.01.2016
+	1. Done even in more neat way. I don't need to use "using" statement every time I want to call SQLiteConnection. I wrapped it into my methods,
+	so every time I call "Select" or "Update", "using" statement done inside them. So for me, as a user, changed nothing - I call same methods with same
+	parameters, but the method's changed itself. Encapsulation! :)
+	2.
+01.02.2016
+	1. Didn't want to do the PutOnSell module, decided to work on adding to SQL software. Also I've worked with 1C this day, so didn't done much.
+

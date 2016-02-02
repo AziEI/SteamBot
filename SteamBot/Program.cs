@@ -1,19 +1,25 @@
 using System;
+using System.Collections.Generic;
+using System.Collections.Specialized;
+using System.Data.SQLite;
+using System.Drawing.Text;
 using System.IO;
+using System.Linq;
+using System.Management;
 using System.Runtime.InteropServices;
+using System.Threading;
+using System.Timers;
+using Csgotm;
+using CsgotmBot;
 using NDesk.Options;
+using SteamAuth;
+using SteamBot.Csgotm;
+using SteamTrade;
 
 namespace SteamBot
 {
     public class Program
     {
-        private static OptionSet opts = new OptionSet()
-                                     {
-                                         {"bot=", "launch a configured bot given that bots index in the configuration array.", 
-                                             b => botIndex = Convert.ToInt32(b) } ,
-                                             { "help", "shows this help text", p => showHelp = (p != null) }
-                                     };
-
         private static bool showHelp;
 
         private static int botIndex = -1;
@@ -23,26 +29,95 @@ namespace SteamBot
         [STAThread]
         public static void Main(string[] args)
         {
-            opts.Parse(args);
+            //SQLiteConnection m_dbConnection;
+            //m_dbConnection = new SQLiteConnection("Data Source=" + CsgotmConfig.PathToSql + "; Version=3");
+            ////m_dbConnection = new SQLiteConnection("Data Source=csgotmBase.sqlite; Version=3");
+            //m_dbConnection.Open();
 
-            if (showHelp)
-            {
-                Console.ForegroundColor = ConsoleColor.White;
-                Console.WriteLine("If no options are given SteamBot defaults to Bot Manager mode.");
-                opts.WriteOptionDescriptions(Console.Out);
-                Console.Write("Press Enter to exit...");
-                Console.ReadLine();
-                return;
-            }
 
-            if (args.Length == 0)
+            //SteamGuardAccount sga = new SteamGuardAccount();
+            //sga.SharedSecret = "";
+            //Console.WriteLine(sga.GenerateSteamGuardCode());
+            //Thread.Sleep(1000000);
+
+
+            CsgotmConfig cf = CsgotmConfig.LoadConfig();
+            CsgotmAPI.SetApiKey(cf.ApiKey);
+
+            if (!CsgotmAPI.ApiKeyIsValid())
             {
-                BotManagerMode();
+                {
+                    Console.WriteLine("API key is not valid. Probably you didn't set ApiKey in csgotmSettings file.");
+                    Console.Write("Press Enter to exit...");
+                    Console.ReadLine();
+                    return;
+                }
             }
-            else if (botIndex > -1)
-            {
-                BotMode(botIndex);
-            }
+            
+
+
+
+
+            //CsgotmAPI.GetTrades();
+            //Console.WriteLine("Sleeping");
+            //CsgotmAPI.StartPingPong(60000);
+
+
+
+            //SQLHelper sqlHelper = SQLHelper.getInstance();
+            //ItemInSQL item = new ItemInSQL("https://market.csgo.com/item/520025252-0-Operation+Breakout+Weapon+Case/",
+            //    CsgotmConfig.ApiKey, CsgotmConfig.SteamWeb, 1, 1, 50, 66);
+            //ItemInSQL itemSelected = sqlHelper.Select(item);
+            //Console.WriteLine(itemSelected.ItemName);
+            ////sqlHelper.Add(item);
+            ////CsgotmAPI.SellItem(item, 150);
+            //Thread.Sleep(200000);
+
+            //GenericInventory inventory = new GenericInventory(CsgotmConfig.SteamWeb);
+
+
+
+
+
+
+
+
+
+
+            //List<ItemInSQL> items = new List<ItemInSQL>();
+            //SQLHelper sqlHelper = null;
+            //try
+            //{
+            //    sqlHelper = SQLHelper.getInstance();
+            //    sqlHelper.Open();
+            //    foreach (var item in items)
+            //    {
+            //            sqlHelper.Add(item);
+
+            //    }
+            //    CsgotmAPI.RenewPrices();
+            //    sqlHelper.Close();
+            //}
+            //catch (Exception e)
+            //{
+            //    Console.WriteLine(e.Message);
+            //    if (sqlHelper != null) {
+            //        sqlHelper.Close();
+            //    }
+            //}
+
+            //Console.WriteLine("Sleeping");
+            //Thread.Sleep(100000);
+            //if (showHelp)
+            //{
+            //    Console.ForegroundColor = ConsoleColor.White;
+            //    Console.WriteLine("If no options are given SteamBot defaults to Bot Manager mode.");
+            //    Console.Write("Press Enter to exit...");
+            //    Console.ReadLine();
+            //    return;
+            //}
+
+            BotManagerMode();
         }
 
         #region SteamBot Operational Modes
@@ -118,9 +193,8 @@ namespace SteamBot
         private static void BotManagerMode()
         {
             Console.Title = "Bot Manager";
-
+            
             manager = new BotManager();
-
             var loadedOk = manager.LoadConfiguration("settings.json");
 
             if (!loadedOk)
@@ -138,7 +212,6 @@ namespace SteamBot
                 if (manager.ConfigObject.AutoStartAllBots)
                 {
                     var startedOk = manager.StartBots();
-
                     if (!startedOk)
                     {
                         Console.WriteLine(
@@ -158,7 +231,6 @@ namespace SteamBot
                         }
                     }
                 }
-
                 Console.WriteLine("Type help for bot manager commands. ");
                 Console.Write("botmgr > ");
 
@@ -202,6 +274,7 @@ namespace SteamBot
             
             return true;
         }
+
 
         #region Console Control Handler Imports
 

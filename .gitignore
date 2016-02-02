@@ -2,6 +2,11 @@
 [Rr]elease
 [Dd]ebug
 packages
+
+*.auth
+*.mafile
+*.json
+
 *.exe
 *.dll
 *.user
