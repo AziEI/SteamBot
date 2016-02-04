@@ -40,20 +40,29 @@ namespace SteamBot
             //Console.WriteLine(sga.GenerateSteamGuardCode());
             //Thread.Sleep(1000000);
 
-
-            CsgotmConfig cf = CsgotmConfig.LoadConfig();
-            CsgotmAPI.SetApiKey(cf.ApiKey);
-
-            if (!CsgotmAPI.ApiKeyIsValid())
+            try
             {
+                CsgotmConfig cf = CsgotmConfig.LoadConfig();
+                CsgotmAPI.SetApiKey(cf.ApiKey);
+
+                if (!CsgotmAPI.ApiKeyIsValid())
                 {
-                    Console.WriteLine("API key is not valid. Probably you didn't set ApiKey in csgotmSettings file.");
-                    Console.Write("Press Enter to exit...");
-                    Console.ReadLine();
-                    return;
+                    {
+                        Console.WriteLine("API key is not valid. Probably you didn't set ApiKey in csgotmSettings file.");
+                        Console.Write("Press Enter to exit...");
+                        Console.ReadLine();
+                        return;
+                    }
                 }
             }
-            
+            catch (Exception e)
+            {
+                Console.WriteLine(e.Message);
+                Console.Write("Press Enter to exit...");
+                Console.ReadLine();
+                return;
+            }
+
 
 
 

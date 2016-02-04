@@ -81,6 +81,8 @@ namespace CsgotmBot
             allowedParameters.Add("Bought");
             allowedParameters.Add("MinPriceBuy");
             allowedParameters.Add("MaxPriceBuy");
+            allowedParameters.Add("MinPriceSell");
+            allowedParameters.Add("MaxPriceSell");
 
             bool first = true;
             bool last = false;
@@ -168,7 +170,7 @@ namespace CsgotmBot
                     var itemInSql = new ItemInSQL(reader.GetInt32(0), reader.GetInt32(1), reader.GetString(2),
                         reader.GetString(3), reader.GetString(4), reader.GetString(5), reader.GetString(6),
                         reader.GetInt32(7), reader.GetInt32(8), reader.GetInt32(9), reader.GetInt32(10),
-                        reader.GetInt32(11), reader.GetInt32(12));
+                        reader.GetInt32(11), reader.GetInt32(12), reader.GetInt32(12), reader.GetInt32(12));
                     items.Add(itemInSql);
                 }
                 if (items.Count == 0)
@@ -206,7 +208,7 @@ namespace CsgotmBot
                     var itemInSql = new ItemInSQL(reader.GetInt32(0), reader.GetInt32(1), reader.GetString(2),
                         reader.GetString(3), reader.GetString(4), reader.GetString(5), reader.GetString(6),
                         reader.GetInt32(7), reader.GetInt32(8), reader.GetInt32(9), reader.GetInt32(10),
-                        reader.GetInt32(11), reader.GetInt32(12));
+                        reader.GetInt32(11), reader.GetInt32(12), reader.GetInt32(13), reader.GetInt32(14));
                     items.Add(itemInSql);
                 }
                 return items;
@@ -239,8 +241,8 @@ namespace CsgotmBot
                     command.Parameters.AddWithValue("@canSell", itemInSql.CanSell);
                     command.Parameters.AddWithValue("@maxToBuy", itemInSql.MaxToBuy);
                     command.Parameters.AddWithValue("@bought", itemInSql.Bought);
-                    command.Parameters.AddWithValue("@minPriceToBuy", itemInSql.MinPriceToBuy);
-                    command.Parameters.AddWithValue("@maxPriceToBuy", itemInSql.MaxPriceToBuy);
+                    command.Parameters.AddWithValue("@minPriceToBuy", itemInSql.MinPriceBuy);
+                    command.Parameters.AddWithValue("@maxPriceToBuy", itemInSql.MaxPriceBuy);
                     command.ExecuteNonQuery();
                     Console.WriteLine("ItemInSQL " + itemInSql.ItemName + " was added successfully!");
                 }

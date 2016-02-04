@@ -21,19 +21,21 @@ namespace Csgotm
         public string ItemUrl { get; }
         public string ItemUrlSteam { get; }
         public string Hash { get; }
-        public int CanBuy { get; }
+        public int CanBuy { get; } //TODO change it to boolean
         public int CanSell { get; }
         public int MaxToBuy { get; }
         public int Bought { get; }
-        public int MinPriceToBuy { get; }
-        public int MaxPriceToBuy { get; }
+        public int MinPriceBuy { get; }
+        public int MaxPriceBuy { get; }
+        public int MinPriceSell { get; }
+        public int MaxPriceSell { get; }
 
         private const string UrlStart1 = "https://market.csgo.com/item/";
         private const string UrlStart2 = "https://csgo.tm/item/";
         private const int CsgoContext = 3;
 
         public ItemInSQL(int n,int context, String classInstance, string itemName, string itemUrl, string itemUrlSteam, string hash,
-            int canBuy,int canSell, int maxToBuy, int bought, int minPriceToBuy, int maxPriceToBuy)
+            int canBuy,int canSell, int maxToBuy, int bought, int minPriceBuy, int maxPriceBuy, int minPriceSell, int maxPriceSell)
         {
             this._n = n;
             this.Context = context;
@@ -46,11 +48,14 @@ namespace Csgotm
             this.CanSell = canSell;
             this.MaxToBuy = maxToBuy;
             this.Bought = bought;
-            this.MinPriceToBuy = minPriceToBuy;
-            this.MaxPriceToBuy = maxPriceToBuy;
+            this.MinPriceBuy = minPriceBuy;
+            this.MaxPriceBuy = maxPriceBuy;
+            this.MinPriceSell = minPriceSell;
+            this.MaxPriceSell = maxPriceSell;
+
         }
         public ItemInSQL(int context, String classInstance, string itemName, string itemUrl, string itemUrlSteam, string hash,
-           int canBuy,int canSell, int maxToBuy, int bought, int minPriceToBuy, int maxPriceToBuy)
+           int canBuy,int canSell, int maxToBuy, int bought, int minPriceBuy, int maxPriceBuy, int minPriceSell, int maxPriceSell)
         {
             this.Context = context;
             this.ClassInstance = classInstance;
@@ -61,11 +66,14 @@ namespace Csgotm
             this.CanSell = canSell;
             this.MaxToBuy = maxToBuy;
             this.Bought = bought;
-            this.MinPriceToBuy = minPriceToBuy;
-            this.MaxPriceToBuy = maxPriceToBuy;
+            this.MinPriceBuy = minPriceBuy;
+            this.MaxPriceBuy = maxPriceBuy;
+            this.MinPriceSell = minPriceSell;
+            this.MaxPriceSell = maxPriceSell;
         }
         //TODO: rewrite without passing apiKey to constructor. Constructor should get API_Key somehow by itself.
-        public ItemInSQL(string itemUrl, string apiKey, SteamWeb steamWeb, int canBuy = 1,int canSell = 1, int maxToBuy = 100, int minPriceToBuy = 0, int maxPriceToBuy = 0)
+        public ItemInSQL(string itemUrl, string apiKey, SteamWeb steamWeb, int canBuy = 1,int canSell = 1, int maxToBuy = 100,
+            int minPriceBuy = 0, int maxPriceBuy = 0, int minPriceSell = 0, int maxPriceSell = 0)
         {
             this.Context = ParseContext(itemUrl);
             this.ClassInstance = ParseClassInstance(itemUrl);
@@ -85,8 +93,10 @@ namespace Csgotm
             this.CanSell = canSell;
             this.MaxToBuy = maxToBuy;
             this.Bought = 0;
-            this.MinPriceToBuy = minPriceToBuy;
-            this.MaxPriceToBuy = maxPriceToBuy;
+            this.MinPriceBuy = minPriceBuy;
+            this.MaxPriceBuy = maxPriceBuy;
+            this.MinPriceSell = minPriceSell;
+            this.MaxPriceSell = maxPriceSell;
         }
 
         public string GetItemClass()

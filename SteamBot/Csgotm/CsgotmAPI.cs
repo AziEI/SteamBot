@@ -13,13 +13,14 @@ using Newtonsoft.Json;
 using SteamBot;
 using SteamBot.Csgotm;
 using SteamBot.TF2GC;
+using SteamKit2.GC.Internal;
 using SteamTrade;
 
 namespace Csgotm
 {
     class CsgotmAPI
     {
-        static object renewPricesLocker = new object();
+        static readonly object RenewAutobuyPricesLocker = new object();
         private static string ApiKey;
 
         //public CsgotmAPI(string apiKey)
@@ -33,59 +34,70 @@ namespace Csgotm
 
         public static Boolean SetAutoBuy(ItemInSQL itemInSql, string apiKey, SteamTrade.SteamWeb steamWeb)
         {
-            String deserializedResponse;
-            string lang = "en"; //needed for some requests
-            //TODO I'm inserting a new AutoBuyPrice, but can't change.
-            //calculating new price for ItemInSQL
-            int currentAutoBuyPrice = GetMaxAutoBuyPriceForItem(itemInSql, lang, apiKey, steamWeb); //100
-            int newPrice;
-            if (currentAutoBuyPrice < itemInSql.MinPriceToBuy)
+            if (itemInSql.CanBuy == 1)
             {
-                newPrice = itemInSql.MinPriceToBuy;
-            }
-            else if (currentAutoBuyPrice < itemInSql.MaxPriceToBuy)
-            {
-                newPrice = currentAutoBuyPrice + 1;
-            }
-            else
-            {
-                newPrice = itemInSql.MaxPriceToBuy;
-            }
-            //trying to update price for ItemInSQL
-            string updateLink = string.Format("https://csgo.tm/api/UpdateOrder/{0}/{1}/{2}/?key={3}",
-                itemInSql.GetItemClass(), itemInSql.GetItemInstance(), newPrice, apiKey);
-
-            string updateJsonResponse = steamWeb.Fetch(updateLink,"GET", null, false, null);
-            deserializedResponse = JsonConvert.DeserializeObject(updateJsonResponse).ToString();
-            //if couldn't find the order in base - create a new one.
-            if (deserializedResponse.ToString().Contains("Данная заявка на покупку не найдена"))
-            {
-                string insertLink = string.Format("https://csgo.tm/api/InsertOrder/{0}/{1}/{2}/{3}/?key={4}",
-                itemInSql.GetItemClass(), itemInSql.GetItemInstance(), newPrice, itemInSql.Hash, apiKey);
-                string insertJsonResponse = steamWeb.Fetch(insertLink, "GET", null, false, null);
-                deserializedResponse = JsonConvert.DeserializeObject(insertJsonResponse).ToString();
-                if (deserializedResponse.Contains("true"))
+                String deserializedResponse;
+                string lang = "en"; //needed for some requests
+                //TODO I'm inserting a new AutoBuyPrice, but can't change.
+                //calculating new price for ItemInSQL
+                int currentAutoBuyPrice = GetMaxAutoBuyPriceForItem(itemInSql, lang, apiKey, steamWeb); //100
+                int newPrice;
+                if (currentAutoBuyPrice < itemInSql.MinPriceBuy)
                 {
-                    Console.WriteLine("A new order for ItemInSQL " + itemInSql.ItemName + " was created successfully!" +
-                                      " Price: " + (double)newPrice/100 + " руб.");
+                    newPrice = itemInSql.MinPriceBuy;
+                }
+                else if (currentAutoBuyPrice < itemInSql.MaxPriceBuy)
+                {
+                    newPrice = currentAutoBuyPrice + 1;
+                }
+                else
+                {
+                    newPrice = itemInSql.MaxPriceBuy;
+                }
+                //trying to update price for ItemInSQL
+                string updateLink = string.Format("https://csgo.tm/api/UpdateOrder/{0}/{1}/{2}/?key={3}",
+                    itemInSql.GetItemClass(), itemInSql.GetItemInstance(), newPrice, apiKey);
+
+                string updateJsonResponse = steamWeb.Fetch(updateLink, "GET", null, false, null);
+                deserializedResponse = JsonConvert.DeserializeObject(updateJsonResponse).ToString();
+                //if couldn't find the order in base - create a new one.
+                if (deserializedResponse.ToString().Contains("Данная заявка на покупку не найдена"))
+                {
+                    string insertLink = string.Format("https://csgo.tm/api/InsertOrder/{0}/{1}/{2}/{3}/?key={4}",
+                        itemInSql.GetItemClass(), itemInSql.GetItemInstance(), newPrice, itemInSql.Hash, apiKey);
+                    string insertJsonResponse = steamWeb.Fetch(insertLink, "GET", null, false, null);
+                    deserializedResponse = JsonConvert.DeserializeObject(insertJsonResponse).ToString();
+                    if (deserializedResponse.Contains("true"))
+                    {
+                        Console.WriteLine("A new autobuy order for ItemInSQL " + itemInSql.ItemName +
+                                          " was created successfully!" +
+                                          " Price: " + (double) newPrice/100 + " руб.");
+                        return true;
+                    }
+                    else if (deserializedResponse.Contains("Неверно задана цена покупки"))
+                    {
+                        Console.WriteLine("Wrong price for " +itemInSql.ItemName + "! Check the prices for buying in database!");
+                        return false;
+                    }
+                    Console.WriteLine("For item: " + itemInSql.ItemName);
+                    Console.WriteLine(deserializedResponse);
+                }
+                else if (deserializedResponse.ToString().Contains("недостаточно средств на счету"))
+                {
+                    Console.WriteLine("Autobuy false. For " + itemInSql.ItemName +
+                                      " - not enough funds in wallet! Пополните кошелек!");
+                    return false;
+                }
+                else if (deserializedResponse.ToString().Contains("true"))
+                {
+                    Console.WriteLine("Autobuy price for " + itemInSql.ItemName + " was updated successfully! New price: " +
+                                      (double) newPrice/100 + " руб.");
                     return true;
                 }
-                Console.WriteLine("For item: " + itemInSql.ItemName);
-                Console.WriteLine(deserializedResponse);
+                //TODO
+                Console.WriteLine("We should never reach here." +
+                                  " A new error ");
             }
-            else if (deserializedResponse.ToString().Contains("недостаточно средств на счету"))
-            {
-                Console.WriteLine("ItemInSQL " + itemInSql.ItemName + " - not enough funds in wallet! Пополните кошелек!");
-                return false;
-            }
-            else if (deserializedResponse.ToString().Contains("true"))
-            {
-                Console.WriteLine("ItemInSQL " + itemInSql.ItemName + " was updated successfully! New price: " + (double)newPrice/100 + " руб.");
-                return true;
-            }
-            //TODO
-            Console.WriteLine("We should never reach here." +
-                              " A new error ");
             return false;
         }
 
@@ -110,17 +122,164 @@ namespace Csgotm
             return response;
         }
 
+        
+
+        public static List<ItemOnCsgotm> GetTrades()
+        {
+            List<ItemOnCsgotm> itemsOnCsgotm = new List<ItemOnCsgotm>();
+            string gettradesLink = string.Format("https://csgo.tm/api/Trades/?key={0}", ApiKey);
+            string jsonTrades = CsgotmConfig.SteamWeb.Fetch(gettradesLink, "GET", null, false, null);
+            if (jsonTrades.Contains("error")) {
+                throw new CsgotmException("error encountered " + jsonTrades);
+            }
+            else if (jsonTrades.Contains("[]"))
+            {
+                //TODO return null items
+            }
+            else
+            {
+                dynamic deserializedResponse = JsonConvert.DeserializeObject(jsonTrades);
+                foreach (var itemOnCsgotm in deserializedResponse)
+                {
+                    var itemId = int.Parse(itemOnCsgotm.ui_id.ToString());
+                    var itemStatus = int.Parse(itemOnCsgotm.ui_status.ToString());
+                    var botId = int.Parse(itemOnCsgotm.ui_bid.ToString());
+                    var classId = int.Parse(itemOnCsgotm.i_classid.ToString());
+                    var instanceId = int.Parse(itemOnCsgotm.i_instanceid.ToString());
+                    itemsOnCsgotm.Add(new ItemOnCsgotm(itemId, classId, instanceId, itemStatus,
+                        botId));
+                }
+                //TODO return what I need in trades.
+                //для изменения цены выставленного на продажу предмета нужно знать ui_id 
+                //для передачи вещей - хз, мб. ui_id
+                //для вывода вещей мне нужно забирать отсюда только список botid.
+            }
+            return itemsOnCsgotm;
+        }
+        
+        public static string ItemRequest(Boolean sendingItems, string botid)
+        {
+            string inOurOut;
+            if (sendingItems)
+            {
+                inOurOut = "in";
+            }
+            else
+            {
+                inOurOut = "out";
+            }
+            string itemRequestLink = String.Format("https://csgo.tm/api/ItemRequest/{0}/{1}/?key={2}",
+                inOurOut, botid, ApiKey);
+            string response = CsgotmConfig.SteamWeb.Fetch(itemRequestLink, "GET", null, false, null);
+            return response;
+        }
+
+        /// <summary>
+        /// 
+        /// </summary>
+        /// <param name="item">The item! :)</param>
+        public static void StopSellingItem(ItemOnCsgotm item)
+        {
+            RenewPriceOrDeleteSellingItem(item, true);
+        }
+
+        public static void RenewPriceOnSellingItem(ItemOnCsgotm item)
+        {
+            RenewPriceOrDeleteSellingItem(item, false);
+        }
+
+        private static void RenewPriceOrDeleteSellingItem(ItemOnCsgotm item, bool stopSelling)
+        {
+            int price = 0;
+            string itemName = "";
+            if (!stopSelling)
+            {
+                SQLHelper sqlHelper = SQLHelper.getInstance();
+                string class_instance = item.getClassInstance();
+                ItemInSQL itemSql = sqlHelper.Select(class_instance);
+                if (itemSql != null)
+                {
+                    itemName = itemSql.ItemName;
+                    price = EvaluatePrice(itemSql);
+                }
+                else
+                {
+                    price = 0;
+                }
+            }
+            else
+            {
+                price = 0;
+            }
+            string changePriceLink = String.Format("https://csgo.tm/api/SetPrice/{0}/{1}/?key={2}",item.ItemId,price,ApiKey);
+            var changePriceResponse = CsgotmConfig.SteamWeb.Fetch(changePriceLink, "GET", null, false, null);
+            if (changePriceResponse.Contains("\"result\":1"))
+            {
+                    Console.WriteLine("Price for item " + itemName + " has changed to " +
+                                      (double) price/100 + ".руб");
+            }
+            else
+            {
+                Console.WriteLine("Error while changing item price: " + changePriceResponse);
+            }
+        }
+        public static void SellItem(ItemInSQL item)
+        {
+            if (item.CanSell == 1)
+            {
+                int price = EvaluatePrice(item);
+                var sellItemLink = string.Format("https://csgo.tm/api/SetPrice/new_{0}/{1}/?key={2}",
+                    item.ClassInstance, price, ApiKey);
+                var sellItemResponse = CsgotmConfig.SteamWeb.Fetch(sellItemLink, "GET", null, false, null);
+                if (sellItemResponse.Contains("\"result\":1"))
+                {
+                    Console.WriteLine(item.ItemName + " is selling for price " + (double) price/100 + " .руб!");
+                }
+                else
+                {
+                    Console.WriteLine("Error while setting item to sell on website: " + sellItemResponse);
+                }
+            }
+        }
+        #region Timer Functions
+        public static void StartPingPong(int delay)
+        {
+            //Perform it once in order to not wait for delay.
+            Console.WriteLine("PingPong started.");
+            System.Timers.Timer pingPongTimer = new System.Timers.Timer(delay);
+            pingPongTimer.Elapsed += PingPong;
+            pingPongTimer.AutoReset = true;
+            pingPongTimer.Enabled = true;
+        }
+        private static void PingPong(Object source, ElapsedEventArgs e)
+        {
+            if (!string.IsNullOrEmpty(ApiKey))
+            {
+                string pingpongLink = string.Format("https://csgo.tm/api/PingPong/?key={0}", ApiKey);
+                string response = CsgotmConfig.SteamWeb.Fetch(pingpongLink, "GET", null, false, null);
+                if (response.Contains("true"))
+                {
+                    Console.WriteLine("PingPong true");
+                }
+                else
+                {
+                    Console.WriteLine("PingPong - FALSE");
+                    Console.WriteLine(response);
+                }
+            }
+            Console.WriteLine("Set API Key!");
+        }
         public static void StartRenewPricesToAutoBuy(int delay)
         {
             System.Timers.Timer renewPricesTimer = new System.Timers.Timer(delay);
-            renewPricesTimer.Elapsed += RenewPrices;
+            renewPricesTimer.Elapsed += RenewAutoBuyPrices;
             renewPricesTimer.AutoReset = true;
             renewPricesTimer.Enabled = true;
             Console.WriteLine("Renew prices started");
         }
-        private static void RenewPrices(Object source, ElapsedEventArgs e) 
+        private static void RenewAutoBuyPrices(Object source, ElapsedEventArgs e)
         {
-            if (Monitor.TryEnter(renewPricesLocker))
+            if (Monitor.TryEnter(RenewAutobuyPricesLocker))
             {
                 try
                 {
@@ -148,128 +307,19 @@ namespace Csgotm
                 }
                 finally
                 {
-                    Monitor.Exit(renewPricesLocker);
+                    Monitor.Exit(RenewAutobuyPricesLocker);
                 }
             }
         }
-
-        public static List<ItemOnCsgotm> GetTrades()
+        public static void StartPutOnSellingItems(int delay)
         {
-            List<ItemOnCsgotm> itemsOnCsgotm = new List<ItemOnCsgotm>();
-            string gettradesLink = string.Format("https://csgo.tm/api/Trades/?key={0}", ApiKey);
-            string jsonTrades = CsgotmConfig.SteamWeb.Fetch(gettradesLink, "GET", null, false, null);
-            if (jsonTrades.Contains("error")) {
-                throw new CsgotmException("error encountered " + jsonTrades);
-            }
-            else if (jsonTrades.Contains("[]"))
-            {
-                //TODO return null items
-            }
-            else
-            {
-                dynamic deserializedResponse = JsonConvert.DeserializeObject(jsonTrades);
-                foreach (var itemOnCsgotm in deserializedResponse)
-                {
-                    var itemId = int.Parse(itemOnCsgotm.ui_id.ToString());
-                    var itemStatus = int.Parse(itemOnCsgotm.ui_status.ToString());
-                    var botId = int.Parse(itemOnCsgotm.ui_bid.ToString());
-                    itemsOnCsgotm.Add(new ItemOnCsgotm(itemId, itemStatus,
-                        botId));
-                }
-                //TODO return what I need in trades.
-                //для изменения цены выставленного на продажу предмета нужно знать ui_id 
-                //для передачи вещей - хз, мб. ui_id
-                //для вывода вещей мне нужно забирать отсюда только список botid.
-            }
-            return itemsOnCsgotm;
+            System.Timers.Timer renewPricesTimer = new System.Timers.Timer(delay);
+            renewPricesTimer.Elapsed += RenewAutoBuyPrices;
+            renewPricesTimer.AutoReset = true;
+            renewPricesTimer.Enabled = true;
+            Console.WriteLine("Renew prices started");
         }
-        public static void StartPingPong(int delay)
-        {
-            //Perform it once in order to not wait for delay.
-            Console.WriteLine("PingPong started.");
-            System.Timers.Timer pingPongTimer = new System.Timers.Timer(delay);
-            pingPongTimer.Elapsed += OnTimedEvent;
-            pingPongTimer.AutoReset = true;
-            pingPongTimer.Enabled = true;
-        }
-        private static bool PingPong()
-        {
-            if (!string.IsNullOrEmpty(ApiKey))
-            {
-                string pingpongLink = string.Format("https://csgo.tm/api/PingPong/?key={0}", ApiKey);
-                string response = CsgotmConfig.SteamWeb.Fetch(pingpongLink, "GET", null, false, null);
-                if (response.Contains("true"))
-                {
-                    Console.WriteLine("PingPong true");
-                    return true;
-                }
-                else
-                {
-                    Console.WriteLine("PingPong - FALSE");
-                    Console.WriteLine(response);
-                    return false;
-                }
-            }
-            Console.WriteLine("Set API Key!");
-            return false;
-        }
-        private static void OnTimedEvent(Object source, ElapsedEventArgs e)
-        {
-                PingPong();
-        }
-        public static string ItemRequest(Boolean sendingItems, string botid)
-        {
-            string inOurOut;
-            if (sendingItems)
-            {
-                inOurOut = "in";
-            }
-            else
-            {
-                inOurOut = "out";
-            }
-            string itemRequestLink = String.Format("https://csgo.tm/api/ItemRequest/{0}/{1}/?key={2}",
-                inOurOut, botid, ApiKey);
-            string response = CsgotmConfig.SteamWeb.Fetch(itemRequestLink, "GET", null, false, null);
-            return response;
-        }
-        /// <summary>
-        /// 
-        /// </summary>
-        /// <param name="item"></param>
-        /// <param name="price">price in kopeck(копейка)</param>
-        public static void SellItem(ItemInSQL item, int price)
-        {
-            string itemInfo = GetItemInfo(item.ClassInstance, "en", ApiKey, CsgotmConfig.SteamWeb);
-            if (!itemInfo.Contains("error"))
-            {
-                dynamic itemInfoJson = JsonConvert.DeserializeObject(itemInfo);
-                var currentLowestPrice = itemInfoJson.offers[0].price;
-                Console.WriteLine("Current price: " + (double)currentLowestPrice/100 + " .руб");
-                if (currentLowestPrice > 100)
-                {
-                    if (currentLowestPrice > price)
-                    {
-                        price = currentLowestPrice - 1;
-                    }
-                }
-                else
-                {
-                    price = 100;
-                }
-                string sellItemLink = String.Format("https://csgo.tm/api/SetPrice/new_{0}/{1}/?key={2}",
-                        item.ClassInstance, price, ApiKey);
-                string sellItemResponse = CsgotmConfig.SteamWeb.Fetch(sellItemLink, "GET", null, false, null);
-                if (sellItemResponse.Contains("\"result\":1"))
-                {
-                    Console.WriteLine(item.ItemName + " is selling!");
-                }
-                else
-                {
-                    Console.WriteLine("Error while setting item to sell on website: " + sellItemResponse);
-                }
-            }
-        }
+        #endregion
 
         public static bool ApiKeyIsValid()
         {
@@ -282,35 +332,81 @@ namespace Csgotm
             }
             return false;
         }
-
+        /// <summary>
+        /// We don't check if we could sell this item.
+        /// </summary>
+        /// <param name="item"></param>
+        /// <returns></returns>
+        private static int EvaluatePrice(ItemInSQL item)
+        {
+            int minPrice = item.MinPriceSell;
+            int maxPrice = item.MaxPriceSell;
+            int price = 0;
+            string itemInfo = GetItemInfo(item.ClassInstance, "en", ApiKey, CsgotmConfig.SteamWeb);
+            if (!itemInfo.Contains("error"))
+            {
+                dynamic itemInfoJson = JsonConvert.DeserializeObject(itemInfo);
+                var currentLowestPrice = itemInfoJson.offers[0].price;
+                Console.WriteLine("Current price: " + (double)currentLowestPrice / 100 + " .руб");
+                if (currentLowestPrice > 100)
+                {
+                    if (currentLowestPrice > maxPrice)
+                    {
+                        price = maxPrice;
+                    }
+                    else if (currentLowestPrice < minPrice)
+                    {
+                        price = minPrice;
+                    }
+                    else if (currentLowestPrice > minPrice)
+                    {
+                        price = currentLowestPrice - 1;
+                    }
+                }
+                else
+                {
+                    price = 100;
+                }
+            }
+            return price;
+        }
     }
 
     class ItemOnCsgotm
     {
-        public int itemId { get; private set; }
-        public ItemOnCsgotmStatus status { get; private set; }
-        public int botId { get; private set; }
+        public int ItemId { get; private set; }
+        public int ClassId { get; private set; }
+        public int InstanceId { get; private set; }
+        public ItemOnCsgotmStatus Status { get; private set; }
+        public int BotId { get; private set; }
 
-        public ItemOnCsgotm(int item_id, int status, int botId)
+        public ItemOnCsgotm(int item_id, int classId, int instanceId, int status, int botId)
         {
-            this.itemId = item_id;
+            this.ItemId = item_id;
+            this.ClassId = classId;
+            this.InstanceId = instanceId;
             //this.status = status;
             switch (status)
             {
                 case 1:
-                    this.status = ItemOnCsgotmStatus.Selling;
+                    this.Status = ItemOnCsgotmStatus.Selling;
                 break;
                 case 2:
-                    this.status = ItemOnCsgotmStatus.SendToCsgotmbot;
+                    this.Status = ItemOnCsgotmStatus.SendToCsgotmbot;
                     break;
                 case 3:
-                    this.status = ItemOnCsgotmStatus.Bought;
+                    this.Status = ItemOnCsgotmStatus.Bought;
                     break;
                 case 4:
-                    this.status = ItemOnCsgotmStatus.ToReceiveFromCsgotmbot;
+                    this.Status = ItemOnCsgotmStatus.ToReceiveFromCsgotmbot;
                     break;
             }
-            this.botId = botId;
+            this.BotId = botId;
+        }
+
+        public string getClassInstance()
+        {
+            return ItemId + "_" + ClassId;
         }
     }
 

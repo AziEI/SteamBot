@@ -155,40 +155,19 @@ namespace SteamBot
 
         public override void OnLoginCompleted() {
             //StartItemsReceiving(30000);
-            CsgotmAPI.GetTrades();
             StartInAndOutItems(30000);
+            StartPutOnSellingItems(90000);
             CsgotmAPI.StartPingPong(181000);
             CsgotmAPI.StartRenewPricesToAutoBuy(60000);
 
             //Bot.GetInventory();lol, this command returns inventory for teamfortress 2 items only.
 
-            SQLHelper sqlHelper = SQLHelper.getInstance();
-            GenericInventory myInventory = new GenericInventory(SteamWeb);
-            List<long> contexts = new List<long>();
-            List<ItemOnCsgotm> itemsOnCsgotm = CsgotmAPI.GetTrades();
-            contexts.Add(2);
-            myInventory.load(730, contexts, Bot.SteamUser.SteamID);
-            //TODO test what's faster this
-            List<ItemOnCsgotm> itemsSelling = ItemsByStatus(itemsOnCsgotm, ItemOnCsgotmStatus.Selling);
-            List<ItemOnCsgotm> itemsToSend = ItemsByStatus(itemsOnCsgotm, ItemOnCsgotmStatus.SendToCsgotmbot);
-            List<ItemOnCsgotm> sellingAndSendingItems = itemsSelling.Concat(itemsToSend).ToList();
+            
 
-            /*items in bot's inventory
-            for which we have a record in sql. If in inventory we find class_instance, for which we don't have a record
-            in sql - we skip this item.
-            */
-            sellingAndSendingItems.Sort();
-            foreach (var item in myInventory.items)
-            {
-                if (sqlHelper.Select(item.Value.descriptionid) == null)
-                {
-                    Log.Error("Item " + item.Value.descriptionid + "Was not found, we don't sell it ");
-                }
-                else
-                {
-                   
-                }
-            }
+
+
+
+            //Log.Info("Items to sell on csgo.tm " + itemsInInventoryToSell.Count);
 
             //TODO test what's faster or this
             //List<ItemInSQL> list = sqlHelper.SelectAll();
@@ -521,13 +500,13 @@ namespace SteamBot
                     Log.Info("Checking if there're items to receive");
                     foreach (var itemOnCsgotm in itemsOnCsgotm)
                     {
-                        if (itemOnCsgotm.status == ItemOnCsgotmStatus.ToReceiveFromCsgotmbot)
+                        if (itemOnCsgotm.Status == ItemOnCsgotmStatus.ToReceiveFromCsgotmbot)
                         {
                             //TODO handle errors if they appear.
                             //Info from bot while we send OUT request for item
                             //{"success":true,"trade":"983185053","nick":"Shepard","botid":239950058,"profile":"https:\/\/steamcommunity.com\/profiles\/76561198200215786\/","secret":"FI4X"}
                             Log.Info("Trying to out items...");
-                            string tradeInfo = CsgotmAPI.ItemRequest(false, itemOnCsgotm.botId.ToString());
+                            string tradeInfo = CsgotmAPI.ItemRequest(false, itemOnCsgotm.BotId.ToString());
                             if (tradeInfo.Contains("true"))
                             {
                                 Log.Info("Trying to accept tradeoffer...");
@@ -557,7 +536,7 @@ namespace SteamBot
                 }
             }
         }
-
+#region Timers
         private void StartInAndOutItems(int delay)
         {
             System.Timers.Timer inAndOutTimer = new System.Timers.Timer(delay);
@@ -600,6 +579,69 @@ namespace SteamBot
                 }
             }
         }
+        public void StartPutOnSellingItems(int delay)
+        {
+            System.Timers.Timer renewPricesTimer = new System.Timers.Timer(delay);
+            renewPricesTimer.Elapsed += PutOnSellingItems;
+            renewPricesTimer.AutoReset = true;
+            renewPricesTimer.Enabled = true;
+            Console.WriteLine("Put on selling items started.");
+        }
+        private void PutOnSellingItems(Object source, ElapsedEventArgs e)
+        {
+            SQLHelper sqlHelper = SQLHelper.getInstance();
+            GenericInventory myInventory = new GenericInventory(SteamWeb);
+            List<long> contexts = new List<long>();
+            List<ItemOnCsgotm> itemsOnCsgotm = CsgotmAPI.GetTrades();
+            contexts.Add(2);
+            myInventory.load(730, contexts, Bot.SteamUser.SteamID);
+            //TODO test what's faster this
+            List<ItemOnCsgotm> itemsSelling = ItemsByStatus(itemsOnCsgotm, ItemOnCsgotmStatus.Selling);
+            List<ItemOnCsgotm> itemsToSend = ItemsByStatus(itemsOnCsgotm, ItemOnCsgotmStatus.SendToCsgotmbot);
+            List<ItemOnCsgotm> sellingAndSendingItems = itemsSelling.Concat(itemsToSend).ToList();
+            Dictionary<string, GenericInventory.ItemDescription> itemsInInventoryToSell = new Dictionary<string, GenericInventory.ItemDescription>(); /*
+            items in my inventory that we're able to sell on csgo.tm
+                */
+            /*items in bot's inventory
+            for which we have a record in sql. If in inventory we find class_instance, for which we don't have a record
+            in sql - we skip this item.
+            */
+            //TODO I think I can create on request to SQL to retreive all items from it.
+            foreach (var description in myInventory.descriptions)
+            {
+                if (description.Value.tradable)
+                {
+                    ItemInSQL itemInSql = sqlHelper.Select(description.Key);
+                    if (itemInSql != null)
+                    {
+                        var itemsInInventory =
+                            myInventory.items.Where(item => item.Value.descriptionid == description.Key);
+                        var csgotmItems =
+                            sellingAndSendingItems.Where(item => (item.ClassId + "_" + item.InstanceId) == description.Key);
+                        if (itemsInInventory.Count() > csgotmItems.Count())
+                        {
+                            int numberOfItemsToSell = itemsInInventory.Count() - csgotmItems.Count();
+                            for (int i = 0; i < numberOfItemsToSell; i++)
+                            {
+                                CsgotmAPI.SellItem(itemInSql);
+                            }
+                        }
+                        if (itemsInInventory.Count() < csgotmItems.Count())
+                        {
+                            int numberOfItemsToDelete = csgotmItems.Count() - itemsInInventory.Count();
+                            var numerator = csgotmItems.GetEnumerator();
+                            for (int i = 0; i < numberOfItemsToDelete; i++)
+                            {
+                                numerator.MoveNext();
+                                CsgotmAPI.StopSellingItem(numerator.Current);
+                            }
+
+                        }
+                    }
+                }
+            }
+        }
+#endregion
 
         /// <summary>
         /// Method returns list of items on web-site for given status.
@@ -608,7 +650,7 @@ namespace SteamBot
         /// <returns></returns>
         private List<ItemOnCsgotm> ItemsByStatus(List<ItemOnCsgotm> itemsOnCsgotm, ItemOnCsgotmStatus givenStatus)
         {
-            var groupedByStatus = itemsOnCsgotm.GroupBy(o => o.status);
+            var groupedByStatus = itemsOnCsgotm.GroupBy(o => o.Status);
             foreach (var status in groupedByStatus)
             {
                 if (status.Key == givenStatus)
@@ -648,7 +690,7 @@ namespace SteamBot
                     //Info from bot while we send OUT request for item
                     //{"success":true,"trade":"983185053","nick":"Shepard","botid":239950058,"profile":"https:\/\/steamcommunity.com\/profiles\/76561198200215786\/","secret":"FI4X"}
                     Log.Info("Trying to out items...");
-                    string tradeInfo = CsgotmAPI.ItemRequest(false, itemOnCsgotm.botId.ToString());
+                    string tradeInfo = CsgotmAPI.ItemRequest(false, itemOnCsgotm.BotId.ToString());
                     if (tradeInfo.Contains("true"))
                     {
                         Log.Info("Trying to accept tradeoffer...");
