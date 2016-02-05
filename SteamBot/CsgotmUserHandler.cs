@@ -155,7 +155,7 @@ namespace SteamBot
 
         public override void OnLoginCompleted() {
             //StartItemsReceiving(30000);
-            StartInAndOutItems(30000);
+            StartInAndOutItems(40000);
             StartPutOnSellingItems(90000);
             CsgotmAPI.StartPingPong(181000);
             CsgotmAPI.StartRenewPricesToAutoBuy(60000);
@@ -745,6 +745,8 @@ namespace SteamBot
                 }
                 else
                 {
+                    CsgotmAPI.UpdateInventory();
+                    Thread.Sleep(10000);//give csgotm time to update inventory.
                     Log.Error(tradeInfo);
                 }
             }

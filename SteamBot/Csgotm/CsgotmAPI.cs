@@ -40,15 +40,15 @@ namespace Csgotm
                 string lang = "en"; //needed for some requests
                 //TODO I'm inserting a new AutoBuyPrice, but can't change.
                 //calculating new price for ItemInSQL
-                int currentAutoBuyPrice = GetMaxAutoBuyPriceForItem(itemInSql, lang, apiKey, steamWeb); //100
+                int currentMaxAutoBuyPrice = GetMaxAutoBuyPriceForItem(itemInSql, lang, apiKey, steamWeb); //100
                 int newPrice;
-                if (currentAutoBuyPrice < itemInSql.MinPriceBuy)
+                if (currentMaxAutoBuyPrice < itemInSql.MinPriceBuy)
                 {
                     newPrice = itemInSql.MinPriceBuy;
                 }
-                else if (currentAutoBuyPrice < itemInSql.MaxPriceBuy)
+                else if (currentMaxAutoBuyPrice < itemInSql.MaxPriceBuy)
                 {
-                    newPrice = currentAutoBuyPrice + 1;
+                    newPrice = currentMaxAutoBuyPrice + 1;
                 }
                 else
                 {
@@ -260,11 +260,18 @@ namespace Csgotm
                 if (response.Contains("true"))
                 {
                     Console.WriteLine("PingPong true");
+                    return;
+                }
+                else if (response.Contains("too early for pong"))
+                {
+                    Console.WriteLine("PingPong true");
+                    return;
                 }
                 else
                 {
                     Console.WriteLine("PingPong - FALSE");
                     Console.WriteLine(response);
+                    return;
                 }
             }
             Console.WriteLine("Set API Key!");
@@ -276,6 +283,63 @@ namespace Csgotm
             renewPricesTimer.AutoReset = true;
             renewPricesTimer.Enabled = true;
             Console.WriteLine("Renew prices started");
+        }
+
+        /// <summary>
+        /// sometimes bot struggles to send item to web-site. Writes something about correspond tradeoffers.
+        /// but after updating inventory everything goes good.
+        /// </summary>
+        public static void UpdateInventory()
+        {
+            string updateLink = string.Format("https://csgo.tm/api/UpdateInventory/?key={0}", ApiKey);
+            string response = CsgotmConfig.SteamWeb.Fetch(updateLink, "GET", null, false, null);
+            if (response.Contains("true"))
+            {
+                Console.WriteLine("Inventory's updated!");
+            }
+            else
+            {
+                Console.WriteLine("Inventory's not updated. Response: ");
+                Console.WriteLine(response);
+            }
+        }
+
+        public static void StopSellingAllItems()
+        {
+            string stopLink = string.Format("https://csgo.tm/api/RemoveAll/?key={0}", ApiKey);
+            string response = CsgotmConfig.SteamWeb.Fetch(stopLink, "GET", null, false, null);
+            if (response.Contains("true"))
+            {
+                Console.WriteLine("All items removed from selling list");
+            }
+            else if (response.Contains("no_items_for_deletion"))
+            {
+                Console.WriteLine("No items in selling list");
+            }
+            else
+            {
+                Console.WriteLine("There was an error stopping selling: ");
+                Console.WriteLine(response);
+            }
+        }
+
+        public static void RemoveAllOrders()
+        {
+            string deleteLink = string.Format("https://csgo.tm/api/DeleteOrders/?key={0}", ApiKey);
+            string response = CsgotmConfig.SteamWeb.Fetch(deleteLink, "GET", null, false, null);
+            if (response.Contains("true"))
+            {
+                Console.WriteLine("Orders were succesfully removed!");
+            }
+            else if (response.Contains("There is no orders for delete."))
+            {
+                Console.WriteLine("No orders to delete.");
+            }
+            else
+            {
+                Console.WriteLine("There was an error deleting orders: ");
+                Console.WriteLine(response);
+            }
         }
         private static void RenewAutoBuyPrices(Object source, ElapsedEventArgs e)
         {
