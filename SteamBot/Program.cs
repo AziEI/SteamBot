@@ -74,11 +74,9 @@ namespace SteamBot
 
 
             //SQLHelper sqlHelper = SQLHelper.getInstance();
-            //ItemInSQL item = new ItemInSQL("https://market.csgo.com/item/520025252-0-Operation+Breakout+Weapon+Case/",
-            //    CsgotmConfig.ApiKey, CsgotmConfig.SteamWeb, 1, 1, 50, 66);
-            //ItemInSQL itemSelected = sqlHelper.Select(item);
-            //Console.WriteLine(itemSelected.ItemName);
-            ////sqlHelper.Add(item);
+            //ItemInSQL item = new ItemInSQL("https://market.csgo.com/item/991959905-0-Falchion%20Case/"
+            //    , CsgotmConfig.SteamWeb, 1, 1, 50, 100,101, 109, 150);
+            //sqlHelper.Add(item);
             ////CsgotmAPI.SellItem(item, 150);
             //Thread.Sleep(200000);
 

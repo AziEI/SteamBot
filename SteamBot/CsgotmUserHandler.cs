@@ -30,7 +30,8 @@ namespace SteamBot
     public class CsgotmUserHandler : UserHandler
     {
         public CsgotmUserHandler(Bot bot, SteamID sid) : base(bot, sid) { }
-        static object timerLocker = new object();
+        static object outItemsLocker = new object();
+        static object putOnSaleLocker = new object();
         public override void OnNewTradeOffer(TradeOffer offer)
         {
             //receiving a trade offer 
@@ -156,7 +157,7 @@ namespace SteamBot
         public override void OnLoginCompleted() {
             //StartItemsReceiving(30000);
             StartInAndOutItems(40000);
-            StartPutOnSellingItems(90000);
+            StartPutOnSellingItems(30000);
             CsgotmAPI.StartPingPong(181000);
             CsgotmAPI.StartRenewPricesToAutoBuy(60000);
 
@@ -492,7 +493,7 @@ namespace SteamBot
         }
         private void OutItemsFromCsgotm(Object source, ElapsedEventArgs e)
         {
-            if (Monitor.TryEnter(timerLocker))
+            if (Monitor.TryEnter(outItemsLocker))
             {
                 try
                 {
@@ -532,7 +533,7 @@ namespace SteamBot
                 }
                 finally
                 {
-                    Monitor.Exit(timerLocker);
+                    Monitor.Exit(outItemsLocker);
                 }
             }
         }
@@ -547,7 +548,7 @@ namespace SteamBot
         }
         private void InAndOutItems(Object source, ElapsedEventArgs e)
         {
-            if (Monitor.TryEnter(timerLocker))
+            if (Monitor.TryEnter(outItemsLocker))
             {
                 try
                 {
@@ -575,7 +576,7 @@ namespace SteamBot
                 }
                 finally
                 {
-                    Monitor.Exit(timerLocker);
+                    Monitor.Exit(outItemsLocker);
                 }
             }
         }
@@ -589,55 +590,70 @@ namespace SteamBot
         }
         private void PutOnSellingItems(Object source, ElapsedEventArgs e)
         {
-            SQLHelper sqlHelper = SQLHelper.getInstance();
-            GenericInventory myInventory = new GenericInventory(SteamWeb);
-            List<long> contexts = new List<long>();
-            List<ItemOnCsgotm> itemsOnCsgotm = CsgotmAPI.GetTrades();
-            contexts.Add(2);
-            myInventory.load(730, contexts, Bot.SteamUser.SteamID);
-            //TODO test what's faster this
-            List<ItemOnCsgotm> itemsSelling = ItemsByStatus(itemsOnCsgotm, ItemOnCsgotmStatus.Selling);
-            List<ItemOnCsgotm> itemsToSend = ItemsByStatus(itemsOnCsgotm, ItemOnCsgotmStatus.SendToCsgotmbot);
-            List<ItemOnCsgotm> sellingAndSendingItems = itemsSelling.Concat(itemsToSend).ToList();
-            Dictionary<string, GenericInventory.ItemDescription> itemsInInventoryToSell = new Dictionary<string, GenericInventory.ItemDescription>(); /*
+            if (Monitor.TryEnter(putOnSaleLocker))
+            {
+                try
+                {
+                    SQLHelper sqlHelper = SQLHelper.getInstance();
+                    GenericInventory myInventory = new GenericInventory(SteamWeb);
+                    List<long> contexts = new List<long>();
+                    List<ItemOnCsgotm> itemsOnCsgotm = CsgotmAPI.GetTrades();
+                    contexts.Add(2);
+                    myInventory.load(730, contexts, Bot.SteamUser.SteamID);
+                    //TODO test what's faster this
+                    List<ItemOnCsgotm> itemsSelling = ItemsByStatus(itemsOnCsgotm, ItemOnCsgotmStatus.Selling);
+                    List<ItemOnCsgotm> itemsToSend = ItemsByStatus(itemsOnCsgotm, ItemOnCsgotmStatus.SendToCsgotmbot);
+                    List<ItemOnCsgotm> sellingAndSendingItems = itemsSelling.Concat(itemsToSend).ToList();
+                    /*
             items in my inventory that we're able to sell on csgo.tm
                 */
-            /*items in bot's inventory
+                    /*items in bot's inventory
             for which we have a record in sql. If in inventory we find class_instance, for which we don't have a record
             in sql - we skip this item.
             */
-            //TODO I think I can create on request to SQL to retreive all items from it.
-            foreach (var description in myInventory.descriptions)
-            {
-                if (description.Value.tradable)
-                {
-                    ItemInSQL itemInSql = sqlHelper.Select(description.Key);
-                    if (itemInSql != null)
+                    //TODO I think I can create on request to SQL to retreive all items from it.
+                    foreach (var description in myInventory.descriptions)
                     {
-                        var itemsInInventory =
-                            myInventory.items.Where(item => item.Value.descriptionid == description.Key);
-                        var csgotmItems =
-                            sellingAndSendingItems.Where(item => (item.ClassId + "_" + item.InstanceId) == description.Key);
-                        if (itemsInInventory.Count() > csgotmItems.Count())
+                        if (description.Value.tradable)
                         {
-                            int numberOfItemsToSell = itemsInInventory.Count() - csgotmItems.Count();
-                            for (int i = 0; i < numberOfItemsToSell; i++)
+                            ItemInSQL itemInSql = sqlHelper.Select(description.Key);
+                            if (itemInSql != null)
                             {
-                                CsgotmAPI.SellItem(itemInSql);
+                                var itemsInInventory =
+                                    myInventory.items.Where(item => item.Value.descriptionid == description.Key);
+                                var csgotmItems =
+                                    sellingAndSendingItems.Where(
+                                        item => (item.ClassId + "_" + item.InstanceId) == description.Key);
+                                if (itemsInInventory.Count() > csgotmItems.Count())
+                                {
+                                    int numberOfItemsToSell = itemsInInventory.Count() - csgotmItems.Count();
+                                    for (int i = 0; i < numberOfItemsToSell; i++)
+                                    {
+                                        CsgotmAPI.SellItem(itemInSql);
+                                    }
+                                }
+                                if (itemsInInventory.Count() < csgotmItems.Count())
+                                {
+                                    int numberOfItemsToDelete = csgotmItems.Count() - itemsInInventory.Count();
+                                    var numerator = csgotmItems.GetEnumerator();
+                                    for (int i = 0; i < numberOfItemsToDelete; i++)
+                                    {
+                                        numerator.MoveNext();
+                                        CsgotmAPI.StopSellingItem(numerator.Current);
+                                    }
+                                }
+                                //Update price for items
+                                foreach (var item in csgotmItems)
+                                {
+                                    CsgotmAPI.RenewPriceOnSellingItem(item);
+                                }
                             }
-                        }
-                        if (itemsInInventory.Count() < csgotmItems.Count())
-                        {
-                            int numberOfItemsToDelete = csgotmItems.Count() - itemsInInventory.Count();
-                            var numerator = csgotmItems.GetEnumerator();
-                            for (int i = 0; i < numberOfItemsToDelete; i++)
-                            {
-                                numerator.MoveNext();
-                                CsgotmAPI.StopSellingItem(numerator.Current);
-                            }
-
                         }
                     }
+                }
+                finally
+                {
+                    Monitor.Exit(putOnSaleLocker);
                 }
             }
         }

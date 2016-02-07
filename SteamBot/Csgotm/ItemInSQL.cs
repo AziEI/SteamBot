@@ -72,7 +72,7 @@ namespace Csgotm
             this.MaxPriceSell = maxPriceSell;
         }
         //TODO: rewrite without passing apiKey to constructor. Constructor should get API_Key somehow by itself.
-        public ItemInSQL(string itemUrl, string apiKey, SteamWeb steamWeb, int canBuy = 1,int canSell = 1, int maxToBuy = 100,
+        public ItemInSQL(string itemUrl, SteamWeb steamWeb, int canBuy = 1,int canSell = 1, int maxToBuy = 100,
             int minPriceBuy = 0, int maxPriceBuy = 0, int minPriceSell = 0, int maxPriceSell = 0)
         {
             this.Context = ParseContext(itemUrl);
@@ -81,7 +81,7 @@ namespace Csgotm
             this.ItemUrlSteam = "";
 
             //getting hash and name for item.
-            string itemInfo = CsgotmAPI.GetItemInfo(ClassInstance,"en",apiKey, steamWeb);
+            string itemInfo = CsgotmAPI.GetItemInfo(ClassInstance,"en", steamWeb);
             dynamic jsonItemInfo = JsonConvert.DeserializeObject(itemInfo);
             this.Hash = jsonItemInfo.hash.ToString();
             this.ItemName = jsonItemInfo.market_name.ToString();

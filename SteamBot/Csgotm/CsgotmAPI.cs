@@ -21,6 +21,7 @@ namespace Csgotm
     class CsgotmAPI
     {
         static readonly object RenewAutobuyPricesLocker = new object();
+        static readonly object PingPongLocker = new object();
         private static string ApiKey;
 
         //public CsgotmAPI(string apiKey)
@@ -111,9 +112,9 @@ namespace Csgotm
             return price;
         }
 
-        public static string GetItemInfo(string class_instance, string lang, string apikey, SteamTrade.SteamWeb steamWeb)
+        public static string GetItemInfo(string class_instance, string lang, SteamTrade.SteamWeb steamWeb)
         {
-            string requestLink = string.Format("https://csgo.tm/api/ItemInfo/{0}/{1}/?key={2}", class_instance, lang, apikey);
+            string requestLink = string.Format("https://csgo.tm/api/ItemInfo/{0}/{1}/?key={2}", class_instance, lang, ApiKey);
             string response = steamWeb.Fetch(requestLink, "GET", null, false, null);
             //if (response.Contains("error"))
             //{
@@ -253,28 +254,38 @@ namespace Csgotm
         }
         private static void PingPong(Object source, ElapsedEventArgs e)
         {
-            if (!string.IsNullOrEmpty(ApiKey))
+            if (Monitor.TryEnter(PingPongLocker))
             {
-                string pingpongLink = string.Format("https://csgo.tm/api/PingPong/?key={0}", ApiKey);
-                string response = CsgotmConfig.SteamWeb.Fetch(pingpongLink, "GET", null, false, null);
-                if (response.Contains("true"))
+                try
                 {
-                    Console.WriteLine("PingPong true");
-                    return;
+                    if (!string.IsNullOrEmpty(ApiKey))
+                    {
+                        string pingpongLink = string.Format("https://csgo.tm/api/PingPong/?key={0}", ApiKey);
+                        string response = CsgotmConfig.SteamWeb.Fetch(pingpongLink, "GET", null, false, null);
+                        if (response.Contains("true"))
+                        {
+                            Console.WriteLine("PingPong true");
+                            return;
+                        }
+                        else if (response.Contains("too early for pong"))
+                        {
+                            Console.WriteLine("PingPong true");
+                            return;
+                        }
+                        else
+                        {
+                            Console.WriteLine("PingPong - FALSE");
+                            Console.WriteLine(response);
+                            return;
+                        }
+                    }
+                    Console.WriteLine("Set API Key!");
                 }
-                else if (response.Contains("too early for pong"))
+                finally
                 {
-                    Console.WriteLine("PingPong true");
-                    return;
-                }
-                else
-                {
-                    Console.WriteLine("PingPong - FALSE");
-                    Console.WriteLine(response);
-                    return;
+                    Monitor.Exit(PingPongLocker);
                 }
             }
-            Console.WriteLine("Set API Key!");
         }
         public static void StartRenewPricesToAutoBuy(int delay)
         {
@@ -347,7 +358,7 @@ namespace Csgotm
             {
                 try
                 {
-                    Console.WriteLine("Renewing prices...");
+                    Console.WriteLine("Renewing autobuy prices...");
                     SQLHelper sqlHelper = SQLHelper.getInstance();
                     List<ItemInSQL> items = sqlHelper.SelectAll();
                     foreach (var item in items)
@@ -375,14 +386,6 @@ namespace Csgotm
                 }
             }
         }
-        public static void StartPutOnSellingItems(int delay)
-        {
-            System.Timers.Timer renewPricesTimer = new System.Timers.Timer(delay);
-            renewPricesTimer.Elapsed += RenewAutoBuyPrices;
-            renewPricesTimer.AutoReset = true;
-            renewPricesTimer.Enabled = true;
-            Console.WriteLine("Renew prices started");
-        }
         #endregion
 
         public static bool ApiKeyIsValid()
@@ -406,31 +409,45 @@ namespace Csgotm
             int minPrice = item.MinPriceSell;
             int maxPrice = item.MaxPriceSell;
             int price = 0;
-            string itemInfo = GetItemInfo(item.ClassInstance, "en", ApiKey, CsgotmConfig.SteamWeb);
+            string itemInfo = GetItemInfo(item.ClassInstance, "en", CsgotmConfig.SteamWeb);
             if (!itemInfo.Contains("error"))
             {
                 dynamic itemInfoJson = JsonConvert.DeserializeObject(itemInfo);
-                var currentLowestPrice = itemInfoJson.offers[0].price;
+                //TODO offers[0] could not exist - if there's no offers for this item.
+                var currentLowestPrice = 0;
+                for (int i = 0; i < 5; i++)
+                {
+                    var debug1 = Int32.Parse(itemInfoJson.offers[i].count.Value);
+                    var debug2 = Int32.Parse(itemInfoJson.offers[i].my_count.Value);
+                    if (debug1 > debug2)
+                    {
+                    //    if (itemInfoJson.offers[i].count > itemInfoJson.offers[i].my_count)
+                    //{
+                        currentLowestPrice = itemInfoJson.offers[i].price;
+                        break;
+                    }
+                }
+                var numberOfMySellingItems = itemInfoJson.offers[0].my_count;
                 Console.WriteLine("Current price: " + (double)currentLowestPrice / 100 + " .руб");
-                if (currentLowestPrice > 100)
-                {
-                    if (currentLowestPrice > maxPrice)
+                    if (numberOfMySellingItems == 0)
                     {
-                        price = maxPrice;
+                        if (currentLowestPrice > maxPrice)
+                        {
+                            price = maxPrice;
+                        }
+                        else if (currentLowestPrice <= minPrice)
+                        {
+                            price = minPrice - 1;
+                        }
+                        else if (currentLowestPrice > minPrice)
+                        {
+                            price = currentLowestPrice - 1;
+                        }
                     }
-                    else if (currentLowestPrice < minPrice)
+                    else
                     {
-                        price = minPrice;
+                        price = currentLowestPrice;
                     }
-                    else if (currentLowestPrice > minPrice)
-                    {
-                        price = currentLowestPrice - 1;
-                    }
-                }
-                else
-                {
-                    price = 100;
-                }
             }
             return price;
         }
@@ -470,7 +487,7 @@ namespace Csgotm
 
         public string getClassInstance()
         {
-            return ItemId + "_" + ClassId;
+            return ClassId + "_" + InstanceId;
         }
     }
 

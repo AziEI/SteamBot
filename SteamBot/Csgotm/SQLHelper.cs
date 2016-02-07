@@ -170,7 +170,7 @@ namespace CsgotmBot
                     var itemInSql = new ItemInSQL(reader.GetInt32(0), reader.GetInt32(1), reader.GetString(2),
                         reader.GetString(3), reader.GetString(4), reader.GetString(5), reader.GetString(6),
                         reader.GetInt32(7), reader.GetInt32(8), reader.GetInt32(9), reader.GetInt32(10),
-                        reader.GetInt32(11), reader.GetInt32(12), reader.GetInt32(12), reader.GetInt32(12));
+                        reader.GetInt32(11), reader.GetInt32(12), reader.GetInt32(13), reader.GetInt32(14));
                     items.Add(itemInSql);
                 }
                 if (items.Count == 0)
@@ -227,8 +227,10 @@ namespace CsgotmBot
                 if (Select(itemInSql) == null)
                 {
                     var insertString = "INSERT INTO Items " +
-                                       "('Context','ItemID','ItemName','ItemURL','ItemURLSteam','Hash','CanBuy','CanSell','MaxToBuy','Bought','MinPriceBuy','MaxPriceBuy')" +
-                                       "VALUES (@context,@itemID,@itemName,@itemURL,@itemURLSteam,@hash,@canBuy,@canSell,@maxToBuy,@bought,@minPriceToBuy,@maxPriceToBuy);";
+                                       "('Context','ItemID','ItemName','ItemURL','ItemURLSteam','Hash','CanBuy'" +
+                                       ",'CanSell','MaxToBuy','Bought','MinPriceBuy','MaxPriceBuy', 'MinPriceSell', 'MaxPriceSell')" +
+                                       "VALUES (@context,@itemID,@itemName,@itemURL,@itemURLSteam,@hash,@canBuy," +
+                                       "@canSell,@maxToBuy,@bought,@minPriceBuy,@maxPriceBuy,@minPriceSell,@maxPriceSell);";
                     var command = new SQLiteCommand(insertString, connection);
                     command.Parameters.AddWithValue("@context", itemInSql.Context);
                     //number for game - csgo = 730, tf2 = 440, dota2 = 570, steam = 753
@@ -241,8 +243,10 @@ namespace CsgotmBot
                     command.Parameters.AddWithValue("@canSell", itemInSql.CanSell);
                     command.Parameters.AddWithValue("@maxToBuy", itemInSql.MaxToBuy);
                     command.Parameters.AddWithValue("@bought", itemInSql.Bought);
-                    command.Parameters.AddWithValue("@minPriceToBuy", itemInSql.MinPriceBuy);
-                    command.Parameters.AddWithValue("@maxPriceToBuy", itemInSql.MaxPriceBuy);
+                    command.Parameters.AddWithValue("@minPriceBuy", itemInSql.MinPriceBuy);
+                    command.Parameters.AddWithValue("@maxPriceBuy", itemInSql.MaxPriceBuy);
+                    command.Parameters.AddWithValue("@minPriceSell", itemInSql.MinPriceSell);
+                    command.Parameters.AddWithValue("@maxPriceSell", itemInSql.MaxPriceSell);
                     command.ExecuteNonQuery();
                     Console.WriteLine("ItemInSQL " + itemInSql.ItemName + " was added successfully!");
                 }
