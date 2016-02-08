@@ -429,25 +429,25 @@ namespace Csgotm
                 }
                 var numberOfMySellingItems = itemInfoJson.offers[0].my_count;
                 Console.WriteLine("Current price: " + (double)currentLowestPrice / 100 + " .руб");
-                    if (numberOfMySellingItems == 0)
-                    {
+                    //if (numberOfMySellingItems == 0)
+                    //{
                         if (currentLowestPrice > maxPrice)
                         {
                             price = maxPrice;
                         }
                         else if (currentLowestPrice <= minPrice)
                         {
-                            price = minPrice - 1;
+                            price = minPrice;
                         }
                         else if (currentLowestPrice > minPrice)
                         {
                             price = currentLowestPrice - 1;
                         }
-                    }
-                    else
-                    {
-                        price = currentLowestPrice;
-                    }
+                    //}
+                    //else
+                    //{
+                    //    price = currentLowestPrice;
+                    //}
             }
             return price;
         }

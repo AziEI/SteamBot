@@ -154,6 +154,17 @@ namespace CsgotmBot
 
         public ItemInSQL Select(string class_instance)
         {
+            ItemInSQL item = SelectWithClassInstance(class_instance);
+            if (item != null)
+                return item;
+
+            //probably we received only class, or received weapon with instance != 0, trying to find item with instance = 0
+            if (class_instance.Contains("_"))
+            {
+                class_instance = class_instance.Remove(class_instance.IndexOf("_", StringComparison.Ordinal));
+            }
+            class_instance += "_0";
+
             return SelectWithClassInstance(class_instance);
         }
         private ItemInSQL SelectWithClassInstance(string class_instance)

@@ -616,7 +616,7 @@ namespace SteamBot
                     {
                         if (description.Value.tradable)
                         {
-                            ItemInSQL itemInSql = sqlHelper.Select(description.Key);
+                            ItemInSQL itemInSql = sqlHelper.Select(description.Key); 
                             if (itemInSql != null)
                             {
                                 var itemsInInventory =
@@ -624,6 +624,12 @@ namespace SteamBot
                                 var csgotmItems =
                                     sellingAndSendingItems.Where(
                                         item => (item.ClassId + "_" + item.InstanceId) == description.Key);
+                                if (!csgotmItems.Any())
+                                {
+                                    //probably we've got a weapon with instance_id !=0, so trying to find items only by class
+                                    csgotmItems = sellingAndSendingItems.Where(
+                                        item => (item.ClassId  == description.Value.classid));
+                                }
                                 if (itemsInInventory.Count() > csgotmItems.Count())
                                 {
                                     int numberOfItemsToSell = itemsInInventory.Count() - csgotmItems.Count();

@@ -124,7 +124,8 @@ namespace SteamBot
             //    return;
             //}
 
-            BotManagerMode();
+            //BotManagerMode();
+            BotMode(0);
         }
 
         #region SteamBot Operational Modes
